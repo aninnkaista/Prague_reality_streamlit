@@ -7,6 +7,7 @@ Created on Sun Jan 31 21:09:16 2021
 
 import requests
 import math
+import re
 
 def get_response(api_url, params, first):
     """To return json response from the url with the given parameters
@@ -51,9 +52,17 @@ def create_reality_list(data_reality):
             reality_dict['size'] = None
         reality_dict['locality'] = est['locality']
         # part of Prague
-        reality_dict['district'] = (est['seo']['locality'].split('-')[0].capitalize()
-                                     + " " +
-                                     est['seo']['locality'].split('-')[1].capitalize())
+        if ',' in est['locality']:
+            reality_dict['district'] = est['locality'].split(',')[1].strip()
+        else:
+            reality_dict['district'] = est['locality'].strip()
+        if re.findall('[0-9]*\s', reality_dict['district']):
+            reality_dict['district'] = re.sub('[0-9]*\s', '', 
+                                              reality_dict['district'])
+        
+        # (est['seo']['locality'].split('-')[0].capitalize()
+        #                              + " " +
+        #                              est['seo']['locality'].split('-')[1].capitalize())
         
         # to check if personal ownership
         if 'personal' in est['labelsAll'][0]:

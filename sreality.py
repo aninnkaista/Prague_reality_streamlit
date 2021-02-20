@@ -7,6 +7,7 @@ Created on Mon Jan 18 21:33:17 2021
 import streamlit as st
 from get_sreality_data import get_response, create_reality_list
 import pandas as pd
+import re
 
 
 st.set_page_config(layout = "wide")
@@ -253,10 +254,43 @@ fig_scatter = go.Figure(data = go.Scatter(
 
 fig_scatter.update_layout( 
                   #title_text = "Prices of flats based on their size",
-                  height = 500, yaxis = {"title":"Price, CZK"}, xaxis = {"title": "Size, m2"})
+                  height = 500, yaxis = {"title":"Price [CZK]"}, xaxis = {"title": "Size, m2"})
 
 st.subheader("Prices of flats based on their size [CZK/m2]")
 st.plotly_chart(fig_scatter, use_container_width=True)
+
+# for bar chart
+price_district_raw = reality_df.groupby(['district', 'disposition']
+                                    )['price_per_m2'].mean().reset_index()
+
+price_district = (price_district_raw.loc[~price_district_raw['district'].str.match('Praha(-)?(Praha)?(\d)*$')]
+                  .sort_values(['disposition', 'price_per_m2'])
+                  )
+price_district['district'] = price_district['district'].str.replace(
+    'Praha Nove', 'Praha Nove Mesto')
+price_district['district'] = price_district['district'].str.replace(
+    'Praha Stare', 'Praha Stare Mesto')
+
+fig_bar = make_subplots(rows = len(disposition_list), cols = 1,
+                    subplot_titles=[i + " average m2 prices [CZK]" for i in disposition_list])
+for i in range(len(disposition_list)):
+    fig_bar.add_trace(go.Bar(name = disposition_list[i], 
+    x = price_district.loc[price_district.disposition == disposition_list[i], 'district'],
+    y = price_district.loc[price_district.disposition == disposition_list[i], 'price_per_m2'].round(-3),
+    marker_color = colors_map[disposition_list[i]],
+    opacity = 0.7),
+    row = i + 1, col = 1)
+    fig_bar.update_yaxes(title_text = "Price per m2, CZK", row = i + 1, col = 1)
+    fig_bar.update_xaxes(tickangle = 30, row = i + 1, col = 1)
+    
+fig_bar.update_layout( 
+                  #title_text = "Prices of flats based on their size",
+                  height = 500 * len(disposition_list))
+
+# To show bar chart
+st.subheader("Prices per m2 in different Prague districts [CZK]")
+st.plotly_chart(fig_bar, use_container_width=True)
+
 
 import plotly.io as pio
 

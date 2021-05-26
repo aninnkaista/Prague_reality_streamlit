@@ -4,17 +4,23 @@ Created on Mon Jan 18 21:33:17 2021
 
 @author: annaa
 """
+
 import streamlit as st
 from get_sreality_data import get_response, create_reality_list
 import pandas as pd
-import re
+from get_price_history import download_prices_history
+
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 
+colors_map = {'1kk': '#008B8B','2kk': '#8B008B', '3kk': '#483D8B'}
+api_url = "https://www.sreality.cz/api/cs/v2/estates"
+
+#----------------------------------------Basic configs------------------------------------------------------------------
 st.set_page_config(layout = "wide")
 
-st.title("Basic overview of flats for sale in Prague")
-
-st.write("Summary of information about 1kk, 2kk and 3kk flats sales prices from sreality.cz.")
+st.markdown("# Basic overview of flats for sale in Prague")
 
 expander = st.beta_expander("Sources and inspirations")
 expander.markdown("""
@@ -24,9 +30,34 @@ expander.markdown("""
 """
 )
 
+# to get history prices data and draw their graphs
+st.markdown("### Historical development")
+@st.cache
+def draw_history_graphs():
+    """To draw index development graph"""
+    prices_index_total = download_prices_history()
+    fig_line = go.Figure(layout={'height':500, 'legend':{'valign':'top', 'orientation': 'v'}, 'margin': {'l': 20, 'r': 20, 't': 20, 'b': 20}},
+                         )
+    i = 1
+    for name, df in prices_index_total.items():
+        fig_line.add_trace(go.Scatter(name=name,
+                                 x=df.index,
+                                 y=df[df.columns[0]],
+                                 #marker_color=colors_map[disposition_list[i]],
+                                 opacity=0.7, mode='lines'))
+        i +=1
+    fig_line.update_yaxes(gridcolor="rgba(232,232,232, 0.3)")
+    fig_line.update_xaxes(tickangle=30, showgrid=False, tickmode='auto', nticks=int(len(df.index)/3))
+    return fig_line
+
+# To show bar chart
+st.markdown("#### Flat price index from the Czech statistical office")
+st.plotly_chart(draw_history_graphs(), use_container_width=True, config=dict(displayModeBar=False))
+st.markdown("### Summary of information about 1kk, 2kk and 3kk flats sales prices from sreality.cz")
+
 # parameters to get data from sreality
 
-api_url = "https://www.sreality.cz/api/cs/v2/estates"
+
 params_init = {
         # flat
         "category_main_cb": "1", 
@@ -112,6 +143,15 @@ disposition_list = col_1.multiselect("Select relevant flat dispositions",
                                   disposition_options,
                                   disposition_options)
 
+# multiple select districts of Prague
+district_list = sorted((init_reality_df[
+    ~init_reality_df['district'].str.match('Praha(-)?(Praha)?(\d)*$')]
+    )['district'].unique())
+# to shorten the name
+
+selected_districts = col_1.multiselect("Select Prague districts",
+                                    district_list,
+                                    district_list)
 
 # to download csv with results
 
@@ -125,7 +165,9 @@ filt_reality_df = init_reality_df.loc[
     (init_reality_df['size'] >= size_range[0]) &
     (init_reality_df['size'] <= size_range[1]) &
     # disposition
-    (init_reality_df.disposition.isin(disposition_list))    
+    (init_reality_df.disposition.isin(disposition_list)) &
+    # districts
+    (init_reality_df.district.isin(selected_districts))
     ]
 # to filter if personal
 if personal_char:
@@ -184,17 +226,9 @@ char_to_show = characteristics_df.T
 char_to_show = (char_to_show[['Count total', 'Count personal', 'Count new flats',
        'Average price, czk', 'Maximum price, czk', 'Minimum price, czk',
        'Average size, m2', 'Maximum size, m2', 'Minimum size, m2']]
-                            .style.format('{:,.0f}')
-                            #.applymap('font-weight: bold',
-                            #          subset = pd.IndexSlice['All_flats', :])
-                            )
-# char_to_show = characteristics_df.T[['Count total', 'Count personal', 'Count new flats',
-#                                      'Average price, czk', 'Maximum price, czk',
-#                                      'Minimum price, czk', 'Average size, m2',
-#                                      'Maximun size, m2', 'Minimum size, m2' ]]
-# to show dfs
-# total df
-st.subheader("Total table with flats overview")
+                            .style.format('{:,.0f}'))
+
+st.markdown("#### Total table with flats overview")
 df_to_show = (reality_df.copy()
               .drop('district', axis = 1)
               .rename(columns={"price": "Price, czk",
@@ -207,13 +241,10 @@ st.dataframe(df_to_show.style.format({"Price, czk":"{:,d}",
                                       "Price per m2, czk":"{:,.0f}"}))
 
 # summary df
-st.subheader("Summary table")
+st.markdown("#### Summary table")
 st.dataframe(char_to_show)
 
-colors_map = {'1kk': '#008B8B','2kk': '#8B008B', '3kk': '#483D8B'}
 
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 
 
 # graph of price distribution for each dispozition
@@ -230,15 +261,16 @@ for i in range(len(disposition_list)):
     x=cur_x.mean(),
     line_color="Red", line_dash = "dash",
     layer="above", line_width=2,
-    row = 1, col = i + 1
-)
+    row = 1, col = i + 1)
+    fig.update_yaxes(gridcolor="rgba(232,232,232, 0.3)")
+
 
 
 fig.update_layout(showlegend = False, 
                   height = 500)
 
 # To show price distribution graph
-st.subheader("Prices distribution for different flat dispositions [CZK]")
+st.markdown("#### Prices distribution for different flat dispositions [CZK]")
 st.plotly_chart(fig, use_container_width=True)
 
 
@@ -254,9 +286,11 @@ fig_scatter = go.Figure(data = go.Scatter(
 
 fig_scatter.update_layout( 
                   #title_text = "Prices of flats based on their size",
-                  height = 500, yaxis = {"title":"Price [CZK]"}, xaxis = {"title": "Size, m2"})
+                  height = 500, yaxis = {"title":"Price [CZK]", "showgrid": False},
+                                xaxis = {"title": "Size, m2", "showgrid": False},
+                  margin = {'l': 20, 'r': 20, 't': 20, 'b': 20})
 
-st.subheader("Prices of flats based on their size [CZK/m2]")
+st.markdown("#### Prices of flats based on their size [CZK/m2]")
 st.plotly_chart(fig_scatter, use_container_width=True)
 
 # for bar chart
@@ -266,11 +300,6 @@ price_district_raw = reality_df.groupby(['district', 'disposition']
 price_district = (price_district_raw.loc[~price_district_raw['district'].str.match('Praha(-)?(Praha)?(\d)*$')]
                   .sort_values(['disposition', 'price_per_m2'])
                   )
-price_district['district'] = price_district['district'].str.replace(
-    'Praha Nove', 'Praha Nove Mesto')
-price_district['district'] = price_district['district'].str.replace(
-    'Praha Stare', 'Praha Stare Mesto')
-
 fig_bar = make_subplots(rows = len(disposition_list), cols = 1,
                     subplot_titles=[i + " average m2 prices [CZK]" for i in disposition_list])
 for i in range(len(disposition_list)):
@@ -280,15 +309,16 @@ for i in range(len(disposition_list)):
     marker_color = colors_map[disposition_list[i]],
     opacity = 0.7),
     row = i + 1, col = 1)
-    fig_bar.update_yaxes(title_text = "Price per m2, CZK", row = i + 1, col = 1)
-    fig_bar.update_xaxes(tickangle = 30, row = i + 1, col = 1)
+    fig_bar.update_yaxes(title_text = "Price per m2, CZK", row = i + 1, col = 1, gridcolor="rgba(232,232,232, 0.3)")
+    fig_bar.update_xaxes(tickangle = 30, row = i + 1, col = 1, showgrid=False)
     
 fig_bar.update_layout( 
                   #title_text = "Prices of flats based on their size",
-                  height = 500 * len(disposition_list))
+                  height = 500 * len(disposition_list)
+                    )
 
 # To show bar chart
-st.subheader("Prices per m2 in different Prague districts [CZK]")
+st.markdown("#### Prices per m2 in different Prague districts [CZK]")
 st.plotly_chart(fig_bar, use_container_width=True)
 
 

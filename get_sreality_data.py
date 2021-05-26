@@ -53,13 +53,16 @@ def create_reality_list(data_reality):
         reality_dict['locality'] = est['locality']
         # part of Prague
         if ',' in est['locality']:
-            reality_dict['district'] = est['locality'].split(',')[1].strip()
+            reality_dict['district'] = (est['locality']
+                                        .split(',')[1]
+                                        .strip())
         else:
             reality_dict['district'] = est['locality'].strip()
         if re.findall('[0-9]*\s', reality_dict['district']):
             reality_dict['district'] = re.sub('[0-9]*\s', '', 
                                               reality_dict['district'])
-        
+        if "-" in reality_dict['district']:
+            reality_dict['district'] = reality_dict['district'].split("-")[1]
         # (est['seo']['locality'].split('-')[0].capitalize()
         #                              + " " +
         #                              est['seo']['locality'].split('-')[1].capitalize())
@@ -80,7 +83,4 @@ def create_reality_list(data_reality):
         reality_list.append(reality_dict)
     
     return reality_list
-
-
-    
     

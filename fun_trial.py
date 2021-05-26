@@ -102,9 +102,19 @@ char_to_show = char_to_show[['Count total', 'Count personal', 'Count new flats',
 # to show dfs
 # total df
 
+# for bar chart
 reality_df['price_per_m2'] = reality_df['price']/reality_df['size']
 
-price_district = reality_df.groupby(['district', 'disposition'])['price_per_m2'].mean()
+price_district_raw = reality_df.groupby(['district', 'disposition']
+                                    )['price_per_m2'].mean().reset_index()
+
+import re
+
+price_district_raw.loc[~price_district_raw['district'].str.extract(r'Praha(\d)?', expand = False).isna().values, :]
+price_district_raw['district'].unique()
+price_district_raw['district'].str.match('Praha(-)?(Praha)?(\d)*$')
+
+re.findall(, string)
 
 colors_map = {'1kk': '#008B8B','2kk': '#8B008B', '3kk': '#483D8B'}
 
@@ -148,6 +158,29 @@ fig_scatter = go.Figure(data = go.Scatter(
 fig_scatter.update_layout( 
                   #title_text = "Prices of flats based on their size",
                   height = 500, yaxis = {"title":"Price, CZK"}, xaxis = {"title": "Size, m2"})
+
+# bar chart
+price_district = (price_district_raw.loc[~price_district_raw.district.isin(['Praha ', 'Praha Praha'])]
+                  .sort_values(['disposition', 'price_per_m2']))
+price_district['district'] = price_district['district'].str.replace(
+    'Praha Nove', 'Praha Nove Mesto')
+price_district['district'] = price_district['district'].str.replace(
+    'Praha Stare', 'Praha Stare Mesto')
+
+fig_bar = make_subplots(rows = len(disposition_list), cols = 1,
+                    subplot_titles=[i + " Prices, CZK" for i in disposition_list])
+for i in range(len(disposition_list)):
+    fig_bar.add_trace(go.Bar(name = disposition_list[i], 
+    x = price_district.loc[price_district.disposition == disposition_list[i], 'district'],
+    y = price_district.loc[price_district.disposition == disposition_list[i], 'price_per_m2'].round(-3),
+    marker_color = colors_map[disposition_list[i]],
+    opacity = 0.7),
+    row = i + 1, col = 1)
+    
+fig_bar.update_layout( 
+                  #title_text = "Prices of flats based on their size",
+                  height = 500 * len(disposition_list), yaxis = {"title":"Price per m2, CZK"}, xaxis = {"title": "Prague district"})
+fig_bar.show()
 
 
 

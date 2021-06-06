@@ -1,9 +1,9 @@
 from bs4 import BeautifulSoup
 import requests
 import re
-import os
 import pandas as pd
 import io
+
 
 def download_prices_history():
     """Returns dictionary of pandas dfs of the newest available flat prices index from the Czech statistical office
@@ -20,9 +20,8 @@ def download_prices_history():
     n_r = requests.get(last_link)
     if r.status_code != 200:
         print(f'link could not be reached, error code is {r.status_code}')
-        os.exit()
+        quit()
     n_soup = BeautifulSoup(n_r.content, 'html.parser')
-
 
     ref_xls = dict()
     links_table = n_soup.select('div.portlet-Attachments a')
@@ -34,16 +33,16 @@ def download_prices_history():
     expr_new = re.compile('.*nov.*bytů.*')
     expr_old = re.compile('.*star.*bytů.*')
 
-
     def read_link_todf(expression, skip_rows, n_cols, header):
         """To return dfs with data based on expression and excel reading criteria"""
         file_cur = requests.get(ref_xls[list(filter(expression.match, ref_xls.keys()))[0]]).content
         # to get pandas df and drop empty columns and rows
-        cur_df = pd.read_excel(io.BytesIO(file_cur), engine='openpyxl', skiprows=skip_rows, header=header).dropna(axis=1, how='all')
-        cur_df = cur_df.iloc[:, :n_cols+1].set_index(cur_df.columns[0])
+        cur_df = pd.read_excel(io.BytesIO(file_cur), engine='openpyxl', skiprows=skip_rows, header=header).dropna(
+            axis=1, how='all')
+        cur_df = cur_df.iloc[:, :n_cols + 1].set_index(cur_df.columns[0])
         return cur_df
 
-    old_df = read_link_todf(expr_old, 7, 3, [0,1])
+    old_df = read_link_todf(expr_old, 7, 3, [0, 1])
     new_df = read_link_todf(expr_new, 3, 1, 0)
 
     return {'older flats': old_df,

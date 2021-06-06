@@ -83,4 +83,3 @@ def create_reality_list(data_reality):
         reality_list.append(reality_dict)
     
     return reality_list
-    

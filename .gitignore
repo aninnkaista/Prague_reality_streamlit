@@ -1,5 +1,6 @@
 *__pycache__*
 *.vscode
 *.venv
+.idea
 fun_trial.py
 try_app.py
